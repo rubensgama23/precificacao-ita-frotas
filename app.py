@@ -1,57 +1,52 @@
-
 import streamlit as st
+from numpy_financial import pmt
 
-st.set_page_config(page_title="Precificação ITA Frotas", layout="centered")
+# Função para calcular a parcela mensal do financiamento
+def calcular_parcela_mensal(valor_veiculo, taxa_juros_mensal, prazo):
+    return -pmt(taxa_juros_mensal, prazo, valor_veiculo)
 
-st.title("📊 Simulador de Precificação - ITA Frotas")
-st.markdown("Este simulador ajuda a calcular a rentabilidade de contratos de locação com base nas premissas operacionais e financeiras da ITA.")
+# Interface do app
+st.set_page_config(page_title="Precificação ITA Frotas", layout="wide")
+st.title("Simulador de Precificação - ITA Frotas")
 
-st.header("1. Dados do Veículo e Contrato")
+st.header("Parâmetros do Contrato")
 
-veiculo = st.text_input("Modelo do veículo", "Corolla")
-quantidade = st.number_input("Quantidade de veículos", min_value=1, value=10)
-preco_tabela = st.number_input("Preço de tabela (R$)", value=125000.0, step=1000.0)
-desconto = st.number_input("Desconto obtido (%)", value=20.0, step=0.5) / 100
-preco_frotista = preco_tabela * (1 - desconto)
+col1, col2, col3 = st.columns(3)
 
-prazo = st.selectbox("Prazo do contrato (meses)", [12, 24, 36])
-km_mes = st.selectbox("Franquia mensal de km", [1000, 2000, 3000])
+with col1:
+    preco_tabela = st.number_input("Preço de Tabela (R$)", value=125000.00, step=1000.0)
+    desconto = st.number_input("Desconto (%)", value=20.0, step=0.1)
+    preco_frotista = preco_tabela * (1 - desconto / 100)
 
-if km_mes == 1000:
-    percentual_despesas = 0.28
-elif km_mes == 2000:
-    percentual_despesas = 0.285
+with col2:
+    prazo = st.selectbox("Prazo do contrato (meses)", [12, 24, 36], index=2)
+    km_franquia = st.selectbox("Franquia mensal (km)", [1000, 2000, 3000], index=0)
+    quantidade = st.number_input("Quantidade de veículos", value=1, step=1)
+
+with col3:
+    taxa_juros = st.number_input("Juros sobre capital de giro (% a.m.)", value=2.00) / 100
+
+st.write("---")
+
+st.subheader("Cálculo de Custos")
+
+if km_franquia == 1000:
+    percentual_despesas = 28.0
+elif km_franquia == 2000:
+    percentual_despesas = 28.5
 else:
-    percentual_despesas = 0.295
+    percentual_despesas = 29.5
 
-despesas_totais = preco_tabela * percentual_despesas * quantidade
+despesas_total = preco_tabela * (percentual_despesas / 100)
+parcela_financiamento = calcular_parcela_mensal(preco_frotista, taxa_juros, prazo)
 
-st.header("2. Financiamento e Capital de Giro")
+parcela_referencia = preco_tabela * 0.032
+valor_total_contrato = parcela_referencia * prazo
 
-juros_financiamento = st.number_input("Juros do financiamento (% a.m.)", value=2.0, step=0.1) / 100
-prazo_financiamento = 24  # fixo por enquanto
-capital_giro_percentual = percentual_despesas  # mesma proporção das despesas
-juros_capital_giro = st.number_input("Juros sobre capital de giro (% a.m.)", value=2.0, step=0.1) / 100
+valor_revenda = preco_tabela * (1 - 0.30)  # depreciação de 30% total
 
-from numpy import pmt
-
-parcela_financiamento = -pmt(juros_financiamento, prazo_financiamento, preco_frotista * quantidade)
-total_financiado = parcela_financiamento * prazo_financiamento
-
-capital_giro = preco_tabela * capital_giro_percentual * quantidade
-custo_capital_giro = capital_giro * juros_capital_giro * (prazo / 12)
-
-st.header("3. Receita e Resultado")
-
-valor_revenda = preco_tabela * (1 - 0.3) * quantidade  # 30% depreciação acumulada
-parcela_cliente = st.number_input("Parcela mensal cobrada do cliente (R$)", value=4000.0, step=100.0)
-faturamento_total = parcela_cliente * prazo * quantidade
-
-lucro = faturamento_total + valor_revenda - (despesas_totais + total_financiado + custo_capital_giro)
-roi = lucro / (preco_frotista * quantidade)
-
-st.subheader("📈 Resultado da Simulação")
-st.markdown(f"**Lucro líquido estimado:** R$ {lucro:,.2f}")
-st.markdown(f"**ROI estimado:** {roi*100:.2f}%")
-st.markdown(f"**Valor da revenda final (estimado):** R$ {valor_revenda:,.2f}")
-st.markdown(f"**Custo estimado com capital de giro:** R$ {custo_capital_giro:,.2f}")
+st.metric("Preço Frotista (R$)", f"{preco_frotista:,.2f}")
+st.metric("Despesa Estimada (R$)", f"{despesas_total:,.2f}")
+st.metric("Parcela de Referência (R$)", f"{parcela_referencia:,.2f}")
+st.metric("Valor de Revenda Estimado (R$)", f"{valor_revenda:,.2f}")
+st.metric("Parcela de Financiamento (R$)", f"{parcela_financiamento:,.2f}")
